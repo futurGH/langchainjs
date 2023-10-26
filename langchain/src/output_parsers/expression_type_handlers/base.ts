@@ -1,4 +1,4 @@
-import { GRAMMAR } from "./grammar/parser_grammar.js";
+import parser from "./peggy-grammar.js";
 
 /**
  * Abstract class for handling nodes in an expression language. Subclasses
@@ -39,8 +39,6 @@ export class ASTParser {
   static async importASTParser() {
     try {
       if (!ASTParser.astParseInstance) {
-        const { default: peggy } = await import("peggy");
-        const parser = peggy.generate(GRAMMAR);
         const { parse } = parser;
         ASTParser.astParseInstance = parse as ParseFunction;
       }
