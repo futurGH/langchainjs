@@ -26,27 +26,6 @@
     function optionalList(value) {
       return value !== null ? value : [];
     };
-  
-function peg$subclass(child, parent) {
-  function C() { this.constructor = child; }
-  C.prototype = parent.prototype;
-  child.prototype = new C();
-}
-
-function peg$SyntaxError(message, expected, found, location) {
-  var self = Error.call(this, message);
-  // istanbul ignore next Check is a necessary evil to support older environments
-  if (Object.setPrototypeOf) {
-    Object.setPrototypeOf(self, peg$SyntaxError.prototype);
-  }
-  self.expected = expected;
-  self.found = found;
-  self.location = location;
-  self.name = "SyntaxError";
-  return self;
-}
-
-peg$subclass(peg$SyntaxError, Error);
 
 function peg$padEnd(str, targetLength, padString) {
   padString = padString || " ";
@@ -56,139 +35,150 @@ function peg$padEnd(str, targetLength, padString) {
   return str + padString.slice(0, targetLength);
 }
 
-peg$SyntaxError.prototype.format = function(sources) {
-  var str = "Error: " + this.message;
-  if (this.location) {
-    var src = null;
-    var k;
-    for (k = 0; k < sources.length; k++) {
-      if (sources[k].source === this.location.source) {
-        src = sources[k].text.split(/\r\n|\n|\r/g);
-        break;
+class peg$SyntaxError extends Error {
+  constructor(message, expected, found, location) {
+    super(message);
+    this.expected = expected;
+    this.found = found;
+    this.location = location;
+    this.name = "SyntaxError";
+  }
+
+  format(sources) {
+    var str = "Error: " + this.message;// @ts-nocheck
+    if (this.location) {
+      var src = null;
+      var k;
+      for (k = 0; k < sources.length; k++) {
+        if (sources[k].source === this.location.source) {
+          src = sources[k].text.split(/\r\n|\n|\r/g);
+          break;
+        }
       }
-    }
-    var s = this.location.start;
-    var offset_s = (this.location.source && (typeof this.location.source.offset === "function"))
-      ? this.location.source.offset(s)
-      : s;
-    var loc = this.location.source + ":" + offset_s.line + ":" + offset_s.column;
-    if (src) {
-      var e = this.location.end;
-      var filler = peg$padEnd("", offset_s.line.toString().length, ' ');
-      var line = src[s.line - 1];
-      var last = s.line === e.line ? e.column : line.length + 1;
-      var hatLen = (last - s.column) || 1;
-      str += "\n --> " + loc + "\n"
+      var s = this.location.start;
+      var offset_s = (this.location.source && (typeof this.location.source.offset === "function"))
+        ? this.location.source.offset(s)
+        : s;
+      var loc = this.location.source + ":" + offset_s.line + ":" + offset_s.column;
+      if (src) {
+        var e = this.location.end;
+        var filler = peg$padEnd("", offset_s.line.toString().length, ' ');
+        var line = src[s.line - 1];
+        var last = s.line === e.line ? e.column : line.length + 1;
+        var hatLen = (last - s.column) || 1;
+        str += "\n --> " + loc + "\n"
           + filler + " |\n"
           + offset_s.line + " | " + line + "\n"
           + filler + " | " + peg$padEnd("", s.column - 1, ' ')
           + peg$padEnd("", hatLen, "^");
-    } else {
-      str += "\n at " + loc;
-    }
-  }
-  return str;
-};
-
-peg$SyntaxError.buildMessage = function(expected, found) {
-  var DESCRIBE_EXPECTATION_FNS = {
-    literal: function(expectation) {
-      return "\"" + literalEscape(expectation.text) + "\"";
-    },
-
-    class: function(expectation) {
-      var escapedParts = expectation.parts.map(function(part) {
-        return Array.isArray(part)
-          ? classEscape(part[0]) + "-" + classEscape(part[1])
-          : classEscape(part);
-      });
-
-      return "[" + (expectation.inverted ? "^" : "") + escapedParts.join("") + "]";
-    },
-
-    any: function() {
-      return "any character";
-    },
-
-    end: function() {
-      return "end of input";
-    },
-
-    other: function(expectation) {
-      return expectation.description;
-    }
-  };
-
-  function hex(ch) {
-    return ch.charCodeAt(0).toString(16).toUpperCase();
-  }
-
-  function literalEscape(s) {
-    return s
-      .replace(/\\/g, "\\\\")
-      .replace(/"/g,  "\\\"")
-      .replace(/\0/g, "\\0")
-      .replace(/\t/g, "\\t")
-      .replace(/\n/g, "\\n")
-      .replace(/\r/g, "\\r")
-      .replace(/[\x00-\x0F]/g,          function(ch) { return "\\x0" + hex(ch); })
-      .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return "\\x"  + hex(ch); });
-  }
-
-  function classEscape(s) {
-    return s
-      .replace(/\\/g, "\\\\")
-      .replace(/\]/g, "\\]")
-      .replace(/\^/g, "\\^")
-      .replace(/-/g,  "\\-")
-      .replace(/\0/g, "\\0")
-      .replace(/\t/g, "\\t")
-      .replace(/\n/g, "\\n")
-      .replace(/\r/g, "\\r")
-      .replace(/[\x00-\x0F]/g,          function(ch) { return "\\x0" + hex(ch); })
-      .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return "\\x"  + hex(ch); });
-  }
-
-  function describeExpectation(expectation) {
-    return DESCRIBE_EXPECTATION_FNS[expectation.type](expectation);
-  }
-
-  function describeExpected(expected) {
-    var descriptions = expected.map(describeExpectation);
-    var i, j;
-
-    descriptions.sort();
-
-    if (descriptions.length > 0) {
-      for (i = 1, j = 1; i < descriptions.length; i++) {
-        if (descriptions[i - 1] !== descriptions[i]) {
-          descriptions[j] = descriptions[i];
-          j++;
-        }
+      } else {
+        str += "\n at " + loc;
       }
-      descriptions.length = j;
     }
-
-    switch (descriptions.length) {
-      case 1:
-        return descriptions[0];
-
-      case 2:
-        return descriptions[0] + " or " + descriptions[1];
-
-      default:
-        return descriptions.slice(0, -1).join(", ")
-          + ", or "
-          + descriptions[descriptions.length - 1];
-    }
+    return str;
   }
 
-  function describeFound(found) {
-    return found ? "\"" + literalEscape(found) + "\"" : "end of input";
+  static buildMessage(expected, found) {
+    var DESCRIBE_EXPECTATION_FNS = {
+      literal: function(expectation) {
+        return "\"" + literalEscape(expectation.text) + "\"";
+      },
+
+      class: function(expectation) {
+        var escapedParts = expectation.parts.map(function(part) {
+          return Array.isArray(part)
+            ? classEscape(part[0]) + "-" + classEscape(part[1])
+            : classEscape(part);
+        });
+
+        return "[" + (expectation.inverted ? "^" : "") + escapedParts.join("") + "]";
+      },
+
+      any: function() {
+        return "any character";
+      },
+
+      end: function() {
+        return "end of input";
+      },
+
+      other: function(expectation) {
+        return expectation.description;
+      }
+    };
+
+    function hex(ch) {
+      return ch.charCodeAt(0).toString(16).toUpperCase();
+    }
+
+    function literalEscape(s) {
+      return s
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g,  "\\\"")
+        .replace(/\0/g, "\\0")
+        .replace(/\t/g, "\\t")
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r")
+        .replace(/[\x00-\x0F]/g,          function(ch) { return "\\x0" + hex(ch); })
+        .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return "\\x"  + hex(ch); });
+    }
+
+    function classEscape(s) {
+      return s
+        .replace(/\\/g, "\\\\")
+        .replace(/\]/g, "\\]")
+        .replace(/\^/g, "\\^")
+        .replace(/-/g,  "\\-")
+        .replace(/\0/g, "\\0")
+        .replace(/\t/g, "\\t")
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r")
+        .replace(/[\x00-\x0F]/g,          function(ch) { return "\\x0" + hex(ch); })
+        .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return "\\x"  + hex(ch); });
+    }
+
+    function describeExpectation(expectation) {
+      return DESCRIBE_EXPECTATION_FNS[expectation.type](expectation);
+    }
+
+    function describeExpected(expected) {
+      var descriptions = expected.map(describeExpectation);
+      var i, j;
+
+      descriptions.sort();
+
+      if (descriptions.length > 0) {
+        for (i = 1, j = 1; i < descriptions.length; i++) {
+          if (descriptions[i - 1] !== descriptions[i]) {
+            descriptions[j] = descriptions[i];
+            j++;
+          }
+        }
+        descriptions.length = j;
+      }
+
+      switch (descriptions.length) {
+        case 1:
+          return descriptions[0];
+
+        case 2:
+          return descriptions[0] + " or " + descriptions[1];
+
+        default:
+          return descriptions.slice(0, -1).join(", ")
+            + ", or "
+            + descriptions[descriptions.length - 1];
+      }
+    }
+
+    function describeFound(found) {
+      return found ? "\"" + literalEscape(found) + "\"" : "end of input";
+    }
+
+    return "Expected " + describeExpected(expected) + " but " + describeFound(found) + " found.";
   }
 
-  return "Expected " + describeExpected(expected) + " but " + describeFound(found) + " found.";
-};
+}
 
 function peg$parse(input, options) {
   options = options !== undefined ? options : {};
