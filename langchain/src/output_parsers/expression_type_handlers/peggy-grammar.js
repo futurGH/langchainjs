@@ -2308,7 +2308,7 @@ function peg$parse(input, options) {
   }
 }
 
-module.exports = {
+export default {
   SyntaxError: peg$SyntaxError,
   parse: peg$parse
 };
