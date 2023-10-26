@@ -31,6 +31,7 @@
     "example": "yarn workspace examples start",
     "precommit": "turbo run precommit",
     "docs": "yarn workspace docs start",
+    "prepare": "turbo run --filter langchain build",
     "postinstall": "husky install"
   },
   "author": "LangChain",
