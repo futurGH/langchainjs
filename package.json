@@ -27,7 +27,6 @@
     "test:int:deps": "docker compose -f test-int-deps-docker-compose.yml up -d",
     "test:int:deps:down": "docker compose -f test-int-deps-docker-compose.yml down",
     "test:exports:docker": "docker compose up --force-recreate",
-    "publish": "turbo run --filter langchain build",
     "example": "yarn workspace examples start",
     "precommit": "turbo run precommit",
     "docs": "yarn workspace docs start",
